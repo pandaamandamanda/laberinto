@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es-ES">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LABERINTO DE PROGRAMACIÓN</title>
+  <meta name="description" content="Juego web educativo para guiar a la panda Amanda hasta su casa usando comandos de programación.">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="assets/images/favicon-panda.png">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__content">
+      <div class="brand">
+        <div class="brand__avatar" aria-hidden="true">🐼</div>
+        <div class="brand__copy">
+          <h1>LABERINTO DE PROGRAMACIÓN</h1>
+          <p class="site-header__lead">GUÍA AL PANDA HASTA CASA ¡SIGUE EL CAMINO Y RECOLECTA LAS LETRAS!</p>
+        </div>
+      </div>
+
+      <div class="header-tools">
+        <div class="player-selector" aria-label="Selección de palabra">
+          <label for="profile-select">ELIGE A TU JUGADOR</label>
+          <div class="player-selector__field">
+            <span class="header-action__avatar player-selector__avatar" aria-hidden="true">🐼</span>
+            <select id="profile-select" aria-label="Seleccionar palabra o nombre"></select>
+          </div>
+          <form class="custom-player" id="custom-player-form" autocomplete="off" hidden>
+            <label class="sr-only" for="custom-player-input">Nombre personalizado, máximo 15 letras</label>
+            <input class="custom-player__input" id="custom-player-input" type="text" inputmode="text" maxlength="15" placeholder="NOMBRE" aria-label="Nombre personalizado, máximo 15 letras">
+            <button class="custom-player__button" id="custom-player-button" type="submit">JUGAR</button>
+          </form>
+        </div>
+        <button class="button button--reset header-reset-button" id="reset-button" type="button" aria-label="Reiniciar juego"><span aria-hidden="true">⟲</span> REINICIAR</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout" aria-live="polite">
+    <section class="game-panel" aria-labelledby="board-title">
+      <h2 id="board-title" class="sr-only">Laberinto</h2>
+      <div class="sr-only" id="game-status" aria-live="polite"></div>
+
+      <div class="board-shell">
+        <div class="axis axis--rows" id="row-axis" aria-hidden="true"></div>
+        <div class="board-wrap">
+          <div class="board" id="board" role="grid" aria-label="Laberinto de 17 columnas por 7 filas"></div>
+        </div>
+        <div class="axis axis--columns" id="column-axis" aria-hidden="true"></div>
+      </div>
+</section>
+
+    <aside class="controls-panel" aria-labelledby="controls-title">
+      <div class="panel__header panel__header--compact">
+        <h2 id="controls-title">PANEL DE JUEGO</h2>
+      </div>
+
+      <section class="control-block control-block--inventory" aria-labelledby="inventory-title">
+        <div class="section-title-row">
+          <h3 id="inventory-title">COMANDOS</h3>
+        </div>
+        <div class="command-grid" id="inventory"></div>
+        <div class="program-actions inventory-actions" aria-label="Acciones del programa">
+          <button class="button button--primary button--control-icon" id="run-button" type="button" aria-label="Ejecutar programa" title="Ejecutar programa"><span aria-hidden="true">▶</span></button>
+          <button class="button button--secondary program-clear button--control-icon" id="undo-button" type="button" aria-label="Quitar último comando" title="Quitar último comando"><span aria-hidden="true">🗑️</span></button>
+          <button class="button button--add-commands button--control-icon" id="more-commands-button" type="button" aria-label="Añadir un comando a cada botón de la cruceta" title="Añadir +1 a cada botón de la cruceta"><span aria-hidden="true">+</span></button>
+        </div>
+
+        <div class="program-panel control-block--program" aria-labelledby="program-title">
+          <div class="section-title-row">
+            <h3 id="program-title">PROGRAMA</h3>
+          </div>
+          <ol class="program-list" id="program-list" aria-label="PROGRAMA"></ol>
+          <span class="program-count" id="program-count">0 PASOS</span>
+        </div>
+      </section>
+
+      <section class="control-block control-block--syllables syllable-panel" id="syllable-panel" aria-labelledby="syllable-title">
+        <h3 id="syllable-title">SÍLABAS</h3>
+        <div class="syllable-table-wrap" id="syllable-table-wrap"></div>
+      </section>
+
+      <details class="solution">
+        <summary>VER SOLUCIÓN SUGERIDA</summary>
+        <p id="solution-text"></p>
+      </details>
+
+    </aside>
+  </main>
+
+  <script src="assets/js/game.js" defer></script>
+</body>
+</html>
