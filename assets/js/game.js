@@ -524,13 +524,49 @@
     ].filter((cell) => isInsideGrid(cell.row, cell.col, rows, cols));
   }
 
+  function getHouseEntranceKey(home) {
+    return home ? coordinateKey(home.row, home.col) : '';
+  }
+
   function getBlockedHouseFootprintKeys(home, rows, cols) {
-    const entranceKey = home ? coordinateKey(home.row, home.col) : '';
+    const entranceKey = getHouseEntranceKey(home);
 
     return new Set(
       getHouseFootprintCells(home, rows, cols)
         .map((cell) => coordinateKey(cell.row, cell.col))
         .filter((key) => key !== entranceKey),
+    );
+  }
+
+  function removeBlockedHouseFootprintCells(openCells, home, rows, cols) {
+    if (!(openCells instanceof Set)) return openCells;
+
+    getBlockedHouseFootprintKeys(home, rows, cols).forEach((key) => {
+      openCells.delete(key);
+    });
+
+    return openCells;
+  }
+
+  function routeEntersHouseFromLeft(route) {
+    if (!Array.isArray(route) || route.length < 2) return false;
+
+    const home = route[route.length - 1];
+    const previous = route[route.length - 2];
+
+    return previous.row === home.row && previous.col === home.col - 1;
+  }
+
+  function isValidHouseRoute(route, rows, cols) {
+    if (!Array.isArray(route) || route.length < 2) return false;
+
+    const home = route[route.length - 1];
+
+    return (
+      home
+      && canPlaceHouseFootprintAt(home.row, home.col, rows, cols)
+      && routeEntersHouseFromLeft(route)
+      && routeAvoidsBlockedHouseFootprint(route, rows, cols)
     );
   }
 
@@ -556,12 +592,56 @@
       const candidate = route.slice(0, lastIndex + 1);
       const home = candidate[candidate.length - 1];
 
-      if (
-        home
-        && canPlaceHouseFootprintAt(home.row, home.col, rows, cols)
-        && routeAvoidsBlockedHouseFootprint(candidate, rows, cols)
-      ) {
+      if (isValidHouseRoute(candidate, rows, cols)) {
         return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  function buildLeftEntranceHouseRoute(rows, cols, targetLength) {
+    const safeTargetLength = clamp(Math.floor(targetLength), 2, rows * cols);
+    const validHomes = [];
+
+    for (let row = 2; row <= rows; row += 1) {
+      for (let col = 2; col < cols; col += 1) {
+        if (canPlaceHouseFootprintAt(row, col, rows, cols)) {
+          validHomes.push({ row, col });
+        }
+      }
+    }
+
+    for (let attempt = 0; attempt < 260; attempt += 1) {
+      const home = validHomes[randomInteger(0, validHomes.length - 1)];
+      if (!home) break;
+
+      const blockedHouseKeys = getBlockedHouseFootprintKeys(home, rows, cols);
+      const reverseRoute = [
+        { ...home },
+        { row: home.row, col: home.col - 1 },
+      ];
+      const used = new Set([
+        coordinateKey(home.row, home.col),
+        coordinateKey(home.row, home.col - 1),
+        ...blockedHouseKeys,
+      ]);
+
+      while (reverseRoute.length < safeTargetLength) {
+        const current = reverseRoute[reverseRoute.length - 1];
+        const candidates = getPathNeighbors(current, rows, cols)
+          .filter((nextCell) => !used.has(coordinateKey(nextCell.row, nextCell.col)));
+
+        if (candidates.length === 0) break;
+
+        const nextCell = candidates[0];
+        reverseRoute.push(nextCell);
+        used.add(coordinateKey(nextCell.row, nextCell.col));
+      }
+
+      if (reverseRoute.length === safeTargetLength) {
+        const route = reverseRoute.slice().reverse();
+        if (isValidHouseRoute(route, rows, cols)) return route;
       }
     }
 
@@ -610,7 +690,7 @@
     const safeMaxLength = Math.min(rows * cols, maxLength);
     let fallbackRoute = null;
 
-    for (let attempt = 0; attempt < 32; attempt += 1) {
+    for (let attempt = 0; attempt < 120; attempt += 1) {
       const route = buildRandomPath({
         rows,
         cols,
@@ -627,15 +707,17 @@
       if (safeRoute) return safeRoute;
     }
 
+    const targetFallbackLength = getRandomInteger(safeMinLength, safeMaxLength);
+    const directHouseRoute = buildLeftEntranceHouseRoute(rows, cols, targetFallbackLength);
     const fallbackSnakeRoute = buildFallbackSnakePath(rows, cols, getRandomGridCell(rows, cols));
     const deterministicFallbackRoute = buildHouseSafeFallbackRoute(rows, cols);
-    const safeFallbackRoute = findHouseSafeRouteSlice(fallbackSnakeRoute, rows, cols, safeMinLength, safeMaxLength)
+    const safeFallbackRoute = directHouseRoute
+      ?? findHouseSafeRouteSlice(fallbackSnakeRoute, rows, cols, safeMinLength, safeMaxLength)
       ?? findHouseSafeRouteSlice(deterministicFallbackRoute, rows, cols, safeMinLength, safeMaxLength)
       ?? findHouseSafeRouteSlice(fallbackRoute, rows, cols, safeMinLength, safeMaxLength);
 
     return safeFallbackRoute
-      ?? deterministicFallbackRoute.slice(0, safeMaxLength)
-      ?? fallbackRoute
+      ?? buildLeftEntranceHouseRoute(rows, cols, safeMinLength)
       ?? buildValidRandomPath(rows, cols, letterCount);
   }
 
@@ -1286,7 +1368,15 @@
     openCells.add(coordinateKey(level.home.row, level.home.col));
     items.forEach((item) => openCells.add(coordinateKey(item.row, item.col)));
     water.forEach((cell) => openCells.delete(cell));
+
+    // La casa ocupa una huella de 2×2: solo la celda inferior izquierda es entrada.
+    // Las dos celdas superiores y la inferior derecha nunca deben quedar como camino.
+    removeBlockedHouseFootprintCells(openCells, level.home, rows, cols);
+    openCells.add(coordinateKey(level.home.row, level.home.col));
+
     trimOpenCellsToPathLengthBounds(openCells, level, items);
+    removeBlockedHouseFootprintCells(openCells, level.home, rows, cols);
+    openCells.add(coordinateKey(level.home.row, level.home.col));
 
     const riverData = buildRiverData(rows, cols, levelIndex, openCells, water);
     const terrainMap = buildTerrainMap(rows, cols, openCells, levelIndex, riverData);
@@ -1858,12 +1948,16 @@
     return Boolean(level && level.mode === 'wide' && level.rows === 7 && level.cols === 17 && state.levelIndex === 0);
   }
 
+  function routeToSvgPoints(route, cellWidth, cellHeight) {
+    return route
+      .map(({ row, col }) => `${((col - 0.5) * cellWidth).toFixed(1)},${((row - 0.5) * cellHeight).toFixed(1)}`)
+      .join(' L ');
+  }
+
   function buildReferencePathMarkup(level, cellWidth, cellHeight) {
     if (!isReferenceLevel(level) || !Array.isArray(level.referenceRoute) || level.referenceRoute.length === 0) return '';
 
-    const points = level.referenceRoute
-      .map(({ row, col }) => `${((col - 0.5) * cellWidth).toFixed(1)},${((row - 0.5) * cellHeight).toFixed(1)}`)
-      .join(' L ');
+    const points = routeToSvgPoints(level.referenceRoute, cellWidth, cellHeight);
     const strokeWidth = (Math.min(cellWidth, cellHeight) * 0.82).toFixed(1);
     const innerWidth = (Math.min(cellWidth, cellHeight) * 0.62).toFixed(1);
 
@@ -1887,10 +1981,7 @@
 
     if (!route.length) return '';
 
-    const points = route
-      .map(({ row, col }) => `${((col - 0.5) * cellSize).toFixed(1)},${((row - 0.5) * cellSize).toFixed(1)}`)
-      .join(' L ');
-
+    const points = routeToSvgPoints(route, cellSize, cellSize);
     const outerWidth = (cellSize * 0.34).toFixed(1);
     const innerWidth = (cellSize * 0.22).toFixed(1);
 
